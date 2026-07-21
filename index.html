@@ -31,7 +31,6 @@
 
   <!-- SETUP -->
   <div id="screen-setup" class="screen active">
-    <button class="rules-trigger" onclick="openRules()" aria-label="Luật chơi">?</button>
     <div class="logo-area">
       <svg width="100%" viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:320px;margin:0 auto;">
         <text x="160" y="52" text-anchor="middle" font-family="'Palatino Linotype',Palatino,serif" font-size="38" font-style="italic" letter-spacing="6" fill="#f5ede8">Spic<tspan fill="#c0392b">ii</tspan></text>
@@ -182,9 +181,7 @@
   <div id="screen-game" class="screen" style="padding:0;gap:0;">
     <div class="game-header">
       <button class="back-btn" onclick="showScreen('screen-setup')">✕ Thoát</button>
-      <div class="heat-wrap">
-        <span class="heat-label" id="heat-label">HEAT 0</span>
-      </div>
+      <button class="rules-trigger" onclick="openRules()" aria-label="Luật chơi">?</button>
     </div>
 
     <div class="game-body">

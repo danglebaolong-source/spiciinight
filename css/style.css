@@ -213,8 +213,6 @@
   .back-btn:hover { color: var(--text); border-color: var(--border2); }
 
   /* Heat bar */
-  .heat-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-  .heat-label { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; }
 /* ── HEAT PROGRESS BAR ── */
   .heat-bar-outer { width: 90px; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
   .heat-bar-inner { height: 100%; border-radius: 2px; transition: width 1s cubic-bezier(0.4,0,0.2,1), background 1.5s ease; }

@@ -317,7 +317,6 @@ function renderTurn() {
     const displayHeat = selectedLevel === 3 ? Math.max(heat, 50) : heat;
     topBar.style.width = displayHeat + '%';
   }
-  document.getElementById('heat-label').textContent = isCooldown ? 'COOLDOWN' : 'HEAT ' + heat;
   const sb = document.getElementById('stage-badge');
   sb.textContent = isCooldown ? '✦ Cooldown' : stage.label;
   sb.style.background = isCooldown ? 'rgba(58,142,212,0.15)' : stage.bg;

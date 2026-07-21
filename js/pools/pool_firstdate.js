@@ -394,7 +394,7 @@ window.POOL_FIRSTDATE = [
     "heat": 32,
     "tags": [],
     "mutexGroup": "dealbreaker_manner",
-    "text": "Hành động của đối phương đối với nhân viên phục vụ sẽ khiến {ME} đánh giá và muốn kết thúc buổi hẹn ngay?"
+    "text": "Hành động nào của đối phương đối với nhân viên phục vụ sẽ khiến {ME} đánh giá và muốn kết thúc buổi hẹn ngay?"
   },
   {
     "id": 1040,
