@@ -1,7 +1,7 @@
 param(
-  [int]$Port = 8123
+  [int]$Port = $(if ($env:PORT) { [int]$env:PORT } else { 8123 })
 )
-$Root = $PSScriptRoot
+$Root = Split-Path -Parent $PSScriptRoot
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$Port/")
 $listener.Start()

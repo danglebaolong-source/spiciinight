@@ -4,8 +4,9 @@
     {
       "name": "static-server",
       "runtimeExecutable": "powershell.exe",
-      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "dev-server.ps1"],
-      "port": 8123
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/dev-server.ps1"],
+      "port": 8123,
+      "autoPort": true
     }
   ]
 }

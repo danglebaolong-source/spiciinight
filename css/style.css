@@ -270,10 +270,6 @@
     font-family: 'DM Sans',sans-serif; font-size: 13px; cursor: pointer;
   }
 
-  /* ── SECRET btn text ── */
-  .btn-reveal { padding:13px; background:rgba(180,120,255,0.18); border:1px solid rgba(180,120,255,0.45); border-radius:12px; color:#d8b4fe; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s; }
-  .btn-reveal:hover { background:rgba(180,120,255,0.28); }
-
   /* ── HAPTIC FLASH ── */
   @keyframes hapticFlash { 0%{opacity:0;} 15%{opacity:0.12;} 100%{opacity:0;} }
   .haptic-flash { position:fixed; inset:0; background:#FF0000; pointer-events:none; z-index:999; opacity:0; }
@@ -325,10 +321,6 @@
     cursor: pointer; transition: all 0.2s;
   }
   .skip-btn:hover { border-color: var(--border2); color: var(--text2); }
-  .keep-btn { display: none !important; }
-  .keep-btn:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
-  .keep-btn.kept { background: var(--amber-bg); border-color: var(--amber); color: var(--amber); }
-  .keep-btn:disabled { opacity: 0.25; cursor: not-allowed; }
   .next-btn {
     flex: 2; padding: 14px;
     background: linear-gradient(135deg, #dc6418 0%, #AF0404 100%);
@@ -353,42 +345,6 @@
     color: var(--text3);
   }
   #action-row .skip-btn:hover { border-color: var(--border2); color: var(--text2); }
-
-  /* ── SECRET CARD ── */
-  .secret-banner {
-    display: none; position: absolute; inset: 0; border-radius: 20px;
-    background: radial-gradient(ellipse at 50% 30%, #2d0a4e 0%, #0f0318 100%);
-    border: 1px solid rgba(180,120,255,0.5);
-    flex-direction: column; align-items: center; justify-content: center;
-    padding: 32px 28px; text-align: center; z-index: 10; cursor: pointer;
-    animation: secretPulse 3s ease-in-out infinite;
-  }
-  .secret-banner::before {
-    content:''; position:absolute; inset:0; border-radius:20px;
-    background: repeating-linear-gradient(135deg,transparent,transparent 24px,rgba(180,120,255,0.03) 24px,rgba(180,120,255,0.03) 25px);
-    pointer-events:none;
-  }
-  @keyframes secretPulse {
-    0%,100% { box-shadow: inset 0 0 40px rgba(140,70,255,0.08), 0 0 20px rgba(140,70,255,0.08); }
-    50%      { box-shadow: inset 0 0 60px rgba(140,70,255,0.18), 0 0 40px rgba(140,70,255,0.2); }
-  }
-  .secret-banner.show { display: flex; }
-  .secret-svg { margin-bottom: 18px; }
-  .secret-label { font-size: 10px; font-weight: 500; color: rgba(192,132,252,0.6); letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 16px; }
-  .secret-hint { font-size: 14px; color: rgba(216,180,254,0.85); line-height: 1.65; max-width: 240px; }
-  .secret-tap { font-size: 11px; color: rgba(167,139,250,0.4); margin-top: 22px; letter-spacing: 0.06em; animation: tapBlink 2.5s ease-in-out infinite; }
-  @keyframes tapBlink { 0%,100%{opacity:0.4;} 50%{opacity:0.85;} }
-  .card-face-front.is-secret {
-    background: radial-gradient(ellipse at 50% 0%, #1e0638 0%, #0a0118 100%);
-    border-color: rgba(180,120,255,0.45);
-  }
-  .secret-actions { display:none; flex-direction:column; gap:6px; margin-top:14px; width:100%; }
-  .secret-actions.show { display:flex; }
-  .btn-reveal { padding:11px; background:rgba(180,120,255,0.18); border:1px solid rgba(180,120,255,0.45); border-radius:12px; color:#d8b4fe; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s; }
-  .btn-reveal:hover { background:rgba(180,120,255,0.28); }
-  .btn-skip-secret { padding:10px; background:transparent; border:1px solid rgba(255,255,255,0.06); border-radius:12px; color:rgba(255,255,255,0.3); font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; transition:all 0.2s; }
-  .btn-skip-secret:hover { color:rgba(255,255,255,0.5); border-color:rgba(255,255,255,0.12); }
-
 
   /* ── SCREEN TRANSITIONS ── */
   .screen { transition: background 1s ease; }
@@ -463,8 +419,6 @@
 
   /* ── BUTTON PRESS ── */
   .next-btn:active, .start-btn:active { transform: scale(0.96); }
-  .keep-btn.bounce { animation: keepBounce 0.35s cubic-bezier(0.36,0.07,0.19,0.97); }
-  @keyframes keepBounce { 0%{transform:scale(1);} 30%{transform:scale(1.12);} 60%{transform:scale(0.95);} 100%{transform:scale(1);} }
 
 
   /* ── CARD GLOW theo intensity ── */
@@ -874,15 +828,4 @@
       height: 290px;
       max-height: 290px;
     }
-  }
-
-  /* ─── SECRET OVERLAY KILL-SWITCH ───────────────────────────────
-     Override mọi rule .secret-banner.show / .secret-actions.show
-     trước đây để đảm bảo các overlay này không bao giờ hiện sau
-     khi cơ chế "Lá bí mật" đã bị disable trong JS. */
-  .secret-banner,
-  .secret-banner.show,
-  .secret-actions,
-  .secret-actions.show {
-    display: none !important;
   }

@@ -11,6 +11,14 @@ const UI_STRINGS = {
   + '• Bộ bài sẽ chỉ gồm các câu hỏi và yêu cầu trực diện. Bạn có toàn quyền tự thiết kế Dare (hình phạt) riêng sao cho phù hợp với không gian và độ thân mật.',
 };
 
+// Tên hiển thị của mỗi Level — khớp với text trên #screen-level, dùng lại
+// cho nút "Nâng nhiệt" ở màn kết thúc.
+const LEVEL_NAMES = {
+  1: 'Nhẹ nhàng và gắn kết',
+  2: 'Riêng tư và tinh tế',
+  3: 'Táo bạo và cuồng nhiệt',
+};
+
 // ─── RULES MODAL ────────────────────────────────────────────────
 // HTML chỉ giữ placeholder text; nội dung thật được inject từ
 // UI_STRINGS.rulesContent (dùng innerHTML để hỗ trợ <br>).
@@ -37,10 +45,10 @@ function showToast(message, duration) {
   _toastTimer = setTimeout(() => toast.classList.remove('show'), duration || 1500);
 }
 
-// No-op fallback — một số flow (secret reveal/skip, history navigation)
-// gọi updateNextButtonText() nhưng hàm chưa được implement. Định nghĩa
-// stub để tránh ReferenceError chặn flow. Có thể nâng cấp sau nếu muốn
-// đổi label nút Tiếp theo theo ngữ cảnh.
+// No-op fallback — flow history navigation gọi updateNextButtonText()
+// nhưng hàm chưa được implement đầy đủ. Định nghĩa stub để tránh
+// ReferenceError chặn flow. Có thể nâng cấp sau nếu muốn đổi label nút
+// Tiếp theo theo ngữ cảnh.
 function updateNextButtonText() {
   try {
     const _script = window._activeSession || currentSession;
@@ -58,8 +66,8 @@ let currentSession = [];
 
 // Sinh mảng card cho session — delegate qua engine.js (window.generateSession).
 // Trả về ARRAY OF CARD OBJECTS (không còn array heat numbers như cũ).
-// Engine đã handle: tag routing N, heat phasing 30/40/30, mutex,
-// fallback 3 tầng, cooldown adjacency, level=3→wild override.
+// Engine đã handle: tag routing N, nearest-rank heat sampling, mutex,
+// duplicate guard, cooldown adjacency, level=3→wild override.
 function generateDynamicScript(level, totalCards) {
   if (typeof window.generateSession !== 'function') {
     console.error('[script] window.generateSession not loaded — engine.js missing?');
@@ -68,10 +76,12 @@ function generateDynamicScript(level, totalCards) {
   return window.generateSession(selectedMode, level, players.length, totalCards);
 }
 
-// Tính tổng số lá session dựa trên số người chơi
+// Tính tổng số lá session dựa trên số người chơi.
+// 2 người (Dating/Couple/Friend-s-2) → 7 lá cố định.
+// Friend-s >2 người → 7 + 3 lá cho mỗi người thêm (N=3→10, N=4→13, ...).
 function computeTotalCards(nPlayers) {
-  if (nPlayers === 2) return 20;
-  return 6 * nPlayers;
+  if (nPlayers === 2) return 7;
+  return 7 + 3 * (nPlayers - 2);
 }
 
 
@@ -92,8 +102,6 @@ let players = [];
 let scriptIndex = 0;
 let currentPlayer = 0;
 let flipped = false;
-let currentCardKept = false;
-let extraDeck = []; // kept cards injected back
 let cardHistory = [];    // stack lá đã hiện, hỗ trợ Quay lại / Tiếp theo
 let cardHistoryIdx = -1; // vị trí hiện tại trong history
 
@@ -134,6 +142,12 @@ function selectPlayers(n, el) {
 }
 
 // ─── ROUTING TỪ SETUP → LEVEL ────────────────────────────────────
+// mode === 'group' && numPlayers === 2 → Level 3 (Wild) bị ẩn/chặn.
+// Dùng chung cho cả màn chọn Level lẫn nút "Nâng nhiệt" ở màn kết thúc.
+function isLevel3Hidden() {
+  return selectedMode === 'group' && numPlayers === 2;
+}
+
 // Bọc showScreen('screen-level') để gài điều kiện ẩn/hiện Level 3 ở
 // thời điểm chuyển màn. Quy tắc:
 //   • mode === 'group' && numPlayers === 2 → ẨN Level 3.
@@ -144,7 +158,7 @@ function applyLevelVisibility() {
   const level3 = document.getElementById('level-card-3')
               || document.querySelector('#screen-level .level-card.l3');
   if (!level3) return;
-  const hide = selectedMode === 'group' && numPlayers === 2;
+  const hide = isLevel3Hidden();
   level3.style.display = hide ? 'none' : '';
   // Nếu Level 3 đang được chọn nhưng vừa bị ẩn → reset selection để
   // tránh trạng thái "đã chọn nhưng không thấy".
@@ -218,19 +232,18 @@ function startGame() {
   }
   scriptIndex = 0;
   currentPlayer = 0;
-  extraDeck = [];
   cardHistory = [];
   cardHistoryIdx = -1;
   // ─── Tính tổng số lá bài + sinh kịch bản động ───────────────
-  // totalCards = 20 nếu 2 người (couple/firstdate/group-2),
-  // ngược lại 6 × players.length (group ≥3).
+  // totalCards = 7 nếu 2 người (couple/firstdate/group-2),
+  // ngược lại 7 + 3 × (players.length - 2) (group ≥3).
   const totalCards = computeTotalCards(players.length);
   currentSession = generateDynamicScript(selectedLevel, totalCards);
   window._activeSession = currentSession;
   showScreen('screen-game');
+  _pickAndPushCard();
   renderTurn();
   showBack();
-  _pickAndPushCard();
 }
 
 // ─── VERTICAL NEON THERMOMETER ───────────────────────────────────
@@ -291,7 +304,9 @@ function renderTurn() {
   void nameEl.offsetWidth;
   nameEl.classList.add('name-anim');
   nameEl.textContent = players[currentPlayer].name;
-  const card = (window._activeSession || currentSession)[scriptIndex];
+  // Ưu tiên window._currentCard (lá THẬT SỰ đã qua pickCard()); fallback về
+  // slot card nếu _pickAndPushCard() chưa chạy (race hiếm).
+  const card = window._currentCard || (window._activeSession || currentSession)[scriptIndex];
   const heat = (card && typeof card.heat === 'number') ? card.heat : 50;
   const isCooldown = !!(card && card.type === 'cooldown');
   const stage = getStage(heat);
@@ -323,31 +338,17 @@ function renderTurn() {
 
 function showBack() {
   flipped = false;
-  currentCardKept = false;
   const flipper = document.getElementById('card-flipper');
   flipper.classList.remove('flipped');
   const front = document.getElementById('card-front');
   front.className = 'card-face-3d card-face-front';
-  const kb = document.getElementById('keep-btn');
-  kb.textContent = '🔖 Giữ';
-  kb.classList.remove('kept');
-  kb.disabled = true;
   (function(){const _ar=document.getElementById('action-row');_ar.classList.add('hidden');_ar.style.display='none';})();
   // Reset consent overlay
   const consentEl = document.getElementById('consent-overlay');
   if (consentEl) consentEl.classList.add('hidden');
   window._pendingCard = null;
-  // Reset secret UI
-  const banner2 = document.getElementById('secret-banner');
-  if (banner2) banner2.classList.remove('show');
-  const sa = document.getElementById('secret-actions');
-  if (sa) { sa.classList.remove('show'); }
-  const cf = document.getElementById('card-front');
-  if (cf) { cf.className = 'card-face-3d card-face-front'; }
   const el2 = document.getElementById('card-badge-el');
   if (el2) el2.style.cssText = '';
-  const kb2 = document.getElementById('keep-btn');
-  if (kb2) kb2.style.display = '';
   const skipB = document.getElementById('skip-btn-el');
   if (skipB) skipB.style.display = '';
   const ft = document.getElementById('card-footer-text');
@@ -364,25 +365,15 @@ function flipCard() {
   if (!window._currentCard) _pickAndPushCard();
   const card = window._currentCard;
 
-  const typeLabel = { truth:'Truth', dare:'Dare', cooldown:'Cooldown', dark:'Dark', secret:'Bí mật' };
+  const typeLabel = { truth:'Truth', dare:'Dare', cooldown:'Cooldown', dark:'Dark' };
   const typeClass  = { truth:'badge-truth', dare:'badge-dare', cooldown:'badge-cooldown', dark:'badge-dark' };
   const glowClass  = { truth:'glow-green', dare:'glow-pink', cooldown:'glow-amber', dark:'glow-dark' };
 
   const el = document.getElementById('card-badge-el');
   const front = document.getElementById('card-front');
-  const banner = document.getElementById('secret-banner');
   const contentEl = document.getElementById('card-content');
   const footerEl = document.getElementById('card-footer-text');
-  const secretActions = document.getElementById('secret-actions');
 
-  // ─── SECRET OVERLAY ĐÃ BỊ DISABLE ─────────────────────────────
-  // Trước đây secret card show banner "Lá bí mật" + 2 nút Tiết lộ/Skip.
-  // Theo yêu cầu UX mới: render thẳng nội dung như card thường, user
-  // lật → đọc → bấm Tiếp theo liên tục, không qua bước trung gian.
-  // pickCard vẫn có thể chọn secret card (guaranteed slot ở firstdate)
-  // nhưng UI sẽ hiển thị y hệt card thường.
-  banner.classList.remove('show');
-  secretActions.classList.remove('show');
   el.style.cssText = '';
 
   // Dark card với intensity 3 — consent check trước (giữ nguyên flow này)
@@ -406,23 +397,18 @@ function flipCard() {
   footerEl.style.display = '';
   footerEl.textContent = 'Hoàn thành xong nhấn Tiếp theo';
 
-  // Nếu là card secret → fallback type cho badge (vì secret không có
-  // trong typeLabel/typeClass mặc định). Treat as 'truth' cho hiển thị.
-  const isSecret = card.secret === true || card.type === 'secret';
-  const renderType = isSecret ? (card.type === 'secret' ? 'truth' : card.type) : card.type;
-  el.textContent = typeLabel[renderType] || renderType || 'Truth';
-  el.className = 'card-type-badge ' + (typeClass[renderType] || '');
+  el.textContent = typeLabel[card.type] || card.type || 'Truth';
+  el.className = 'card-type-badge ' + (typeClass[card.type] || '');
   contentEl.textContent = renderText(card.text);
 
   // Style card theo type + intensity glow
   let cardClass = 'card-face-3d card-face-front';
-  if (renderType === 'dark')     cardClass += ' is-dark';
-  if (renderType === 'cooldown') cardClass += ' is-cooldown';
-  if (card.intensity)            cardClass += ' intensity-' + card.intensity;
+  if (card.type === 'dark')     cardClass += ' is-dark';
+  if (card.type === 'cooldown') cardClass += ' is-cooldown';
+  if (card.intensity)           cardClass += ' intensity-' + card.intensity;
   front.className = cardClass;
 
   (function(){const _ar=document.getElementById('action-row');_ar.classList.remove('hidden');_ar.style.display='flex';})();
-  document.getElementById('keep-btn').disabled = false;
 
   // Haptic cho intensity cao + heat 100
   if (card.intensity >= 3 || card.heat >= 100) hapticVibrate(card.intensity || 3);
@@ -432,45 +418,13 @@ function flipCard() {
   playSound('flip');
 }
 
-function secretSkip() {
-  // Giữ bí mật - chỉ hiện nút Tiếp theo
-  document.getElementById('secret-actions').classList.remove('show');
-  document.getElementById('keep-btn').style.display = 'none';
-  const skipEl = document.getElementById('skip-btn-el');
-  if (skipEl) skipEl.style.display = 'none';
-  const footerEl = document.getElementById('card-footer-text');
-  footerEl.style.display = '';
-  footerEl.textContent = '';
-  (function(){const _ar=document.getElementById('action-row');_ar.classList.remove('hidden');_ar.style.display='flex';})();
-  updateNextButtonText();
-}
-
-
-function secretReveal() {
-  // Tiết lộ: giữ nguyên thẻ để người kia xem, rồi next
-  playSound('keep');
-  document.getElementById('secret-actions').style.display = 'none';
-  document.getElementById('card-footer-text').style.display = 'none';
-  (function(){const _ar=document.getElementById('action-row');_ar.classList.remove('hidden');_ar.style.display='flex';})();
-  document.getElementById('keep-btn').disabled = true;
-}
-
-
 // ─── CARD PICKING ─────────────────────────────────────────────────
 
 function pickCard() {
   // ENGINE-DRIVEN PICK: session đã được window.generateSession pre-build
-  // sẵn toàn bộ card. Hàm này chỉ:
-  //   1) Trả ngẫu nhiên 1 lá từ extraDeck (kept cards) với xác suất 30%.
-  //   2) Else trả card kế tiếp trong currentSession theo scriptIndex.
-  //
-  // Mọi logic phức tạp (tag filter, mutex, heat floor, finale, fallback)
-  // đã được engine.js xử lý gọn ở phía generateSession. KHÔNG cần scan
-  // pool nữa.
-  if (extraDeck.length > 0 && Math.random() < 0.3) {
-    const idx = Math.floor(Math.random() * extraDeck.length);
-    return extraDeck.splice(idx, 1)[0];
-  }
+  // sẵn toàn bộ card. Hàm này chỉ trả card kế tiếp trong currentSession
+  // theo scriptIndex — mọi logic phức tạp (tag filter, mutex, heat floor,
+  // finale, fallback) đã được engine.js xử lý gọn ở phía generateSession.
   const session = window._activeSession || currentSession;
   const card = session[scriptIndex];
   if (!card) {
@@ -515,80 +469,46 @@ function renderText(tpl) {
 }
 
 // ─── ACTIONS ──────────────────────────────────────────────────────
-function keepCard() {
-  if (!flipped || currentCardKept) return;
-  currentCardKept = true;
-  if (window._currentCard) {
-    extraDeck.push({ ...window._currentCard });
-  }
-  const kb = document.getElementById('keep-btn');
-  kb.textContent = '✓ Đã giữ';
-  kb.classList.add('kept','bounce');
-  kb.disabled = true;
-  playSound('keep');
-  setTimeout(() => kb.classList.remove('bounce'), 400);
-}
 
 // Render lá cũ từ history. KHÔNG advance state, KHÔNG kích lại gate.
 // Accept history item ({card, player, slotIdx}) hoặc card object trực tiếp.
 //   - Truth/Dare/Cooldown/Dark: hiện nội dung, ẩn mọi overlay
-//   - Secret: hiện banner khóa + thay text hint, không cho click reveal
 //   - Dark (đã consent): KHÔNG hiện lại consent gate
 function renderCardSimple(item) {
   const card = item && item.card ? item.card : item;
-  const isSecret = card.secret === true || card.type === 'secret';
 
   // Defensive: mark card front đang hiện (gate flag cho mọi handler khác)
   flipped = true;
   document.getElementById('card-flipper').classList.add('flipped');
 
-  const typeLabel = { truth:'Truth', dare:'Dare', cooldown:'Cooldown', dark:'Dark', secret:'Bí mật' };
+  const typeLabel = { truth:'Truth', dare:'Dare', cooldown:'Cooldown', dark:'Dark' };
   const typeClass = { truth:'badge-truth', dare:'badge-dare', cooldown:'badge-cooldown', dark:'badge-dark' };
   const el = document.getElementById('card-badge-el');
   const front = document.getElementById('card-front');
-  const banner = document.getElementById('secret-banner');
   const contentEl = document.getElementById('card-content');
   const footerEl = document.getElementById('card-footer-text');
-  const secretActions = document.getElementById('secret-actions');
   const consentEl = document.getElementById('consent-overlay');
 
   // LUÔN ẩn consent gate (lá Dangerous đã được consent rồi)
   if (consentEl) consentEl.classList.add('hidden');
-  // LUÔN ẩn secret-actions (chỉ hiện ở first reveal)
-  if (secretActions) secretActions.classList.remove('show');
 
   // Reset badge inline style
   el.style.cssText = '';
 
-  // ─── SECRET OVERLAY ĐÃ BỊ DISABLE ─────────────────────────────
-  // Bypass branch isSecret — luôn render trực diện như card thường.
-  // (Giữ biến isSecret để fallback type/badge phía dưới.)
-  if (banner) {
-    banner.classList.remove('show');
-    // Restore .secret-tap display (defensive, không còn dùng)
-    const tap = banner.querySelector('.secret-tap');
-    if (tap) tap.style.display = '';
-  }
-  {
-    // Secret card fallback: render với type 'truth' để badge có style hợp lệ
-    const renderType = isSecret ? (card.type === 'secret' ? 'truth' : card.type) : card.type;
-    el.textContent = typeLabel[renderType] || renderType || 'Truth';
-    el.className = 'card-type-badge ' + (typeClass[renderType] || '');
-    let cardClass = 'card-face-3d card-face-front';
-    if (renderType === 'dark')     cardClass += ' is-dark';
-    if (renderType === 'cooldown') cardClass += ' is-cooldown';
-    if (card.intensity)            cardClass += ' intensity-' + card.intensity;
-    front.className = cardClass;
-    contentEl.style.display = '';
-    contentEl.textContent = renderText(card.text);
-    footerEl.style.display = '';
-    footerEl.textContent = UI_STRINGS.cardFooter || 'Hoàn thành xong nhấn Tiếp theo';
-  }
+  el.textContent = typeLabel[card.type] || card.type || 'Truth';
+  el.className = 'card-type-badge ' + (typeClass[card.type] || '');
+  let cardClass = 'card-face-3d card-face-front';
+  if (card.type === 'dark')     cardClass += ' is-dark';
+  if (card.type === 'cooldown') cardClass += ' is-cooldown';
+  if (card.intensity)           cardClass += ' intensity-' + card.intensity;
+  front.className = cardClass;
+  contentEl.style.display = '';
+  contentEl.textContent = renderText(card.text);
+  footerEl.style.display = '';
+  footerEl.textContent = UI_STRINGS.cardFooter || 'Hoàn thành xong nhấn Tiếp theo';
 
   // Action row luôn hiện (Quay lại + Tiếp theo)
   (function(){const _ar=document.getElementById('action-row');_ar.classList.remove('hidden');_ar.style.display='flex';})();
-  // Keep-btn chỉ enable khi KHÔNG phải secret (secret card đã thực hiện rồi, không cho keep nữa)
-  document.getElementById('keep-btn').disabled = isSecret;
 
   updateNextButtonText();
 }
@@ -663,14 +583,15 @@ function nextCard() {
       hapticVibrate(3);
     }
     currentPlayer = (currentPlayer + 1) % players.length;
-    const prevC = currentSession[Math.max(0, scriptIndex-1)];
-    const nextC = currentSession[scriptIndex];
-    const prevStage = getStage(prevC ? prevC.heat : 0).label;
+    // prevStage/newStage lấy từ cardHistory / window._currentCard thay vì
+    // session[scriptIndex] trực tiếp, để luôn khớp với lá thật sự hiển thị.
+    const prevItem = cardHistory[cardHistory.length - 1];
+    const prevStage = getStage(prevItem && prevItem.card ? prevItem.card.heat : 0).label;
+    _pickAndPushCard();
     renderTurn();
-    const newStage = getStage(nextC ? nextC.heat : 0).label;
+    const newStage = getStage(window._currentCard ? window._currentCard.heat : 0).label;
     if (prevStage !== newStage) triggerStageFlash(newStage);
     showBack();
-    _pickAndPushCard();
     scene.classList.add('slide-in');
     setTimeout(() => scene.classList.remove('slide-in'), 350);
   }, 260);
@@ -702,7 +623,6 @@ function consentReveal() {
   footerEl.style.display = '';
   footerEl.textContent = 'Hoàn thành xong nhấn Tiếp theo';
   (function(){const _ar=document.getElementById('action-row');_ar.classList.remove('hidden');_ar.style.display='flex';})();
-  document.getElementById('keep-btn').disabled = false;
   hapticVibrate(3);
 }
 
@@ -761,19 +681,33 @@ function showEndScreen() {
 
   if (selectedLevel === 1) {
     if (titleEl)   titleEl.innerHTML = 'Tuyệt vời';
-    if (replayBtn) replayBtn.textContent = 'Chơi lại';
     injectRatingIcons('❤️');
     if (spiceBlock) spiceBlock.style.display = '';
   } else if (selectedLevel === 2) {
     if (titleEl)   titleEl.innerHTML = 'Quá đã!';
-    if (replayBtn) replayBtn.textContent = 'Chơi lại';
     injectRatingIcons('🌶');
     if (spiceBlock) spiceBlock.style.display = '';
   } else {
     if (titleEl)   titleEl.innerHTML = 'BANGGG! 💥';
-    if (replayBtn) replayBtn.textContent = 'Chơi lại';
     injectRatingIcons('🌶');
     if (spiceBlock) spiceBlock.style.display = '';
+  }
+
+  // ─── CTA: mời nâng level thay vì chỉ chơi lại y hệt ───────────────
+  // selectedLevel < 3 và tổ hợp mode/numPlayers không bị chặn Level 3
+  // (xem isLevel3Hidden) → đổi nút thành "Nâng nhiệt lên [Level kế]".
+  // Ngược lại (đã ở Level 3, hoặc combo group+2 không thể lên Wild) →
+  // giữ nút chơi lại bình thường.
+  const nextLevel = selectedLevel + 1;
+  const canEscalate = selectedLevel < 3 && !(nextLevel === 3 && isLevel3Hidden());
+  if (replayBtn) {
+    if (canEscalate) {
+      replayBtn.textContent = 'Nâng nhiệt lên ' + LEVEL_NAMES[nextLevel] + ' →';
+      replayBtn.onclick = () => replayGame(nextLevel);
+    } else {
+      replayBtn.textContent = 'Chơi lại';
+      replayBtn.onclick = () => replayGame();
+    }
   }
 
   if (labelEl) labelEl.textContent = 'Để lại cảm nhận để Spicii Night cải tiến tốt hơn nhé';
@@ -794,10 +728,12 @@ function rateSpice(score) {
   if ('vibrate' in navigator) navigator.vibrate(15);
 }
 
-function replayGame() {
+// nextLevel (optional) — dùng khi user bấm "Nâng nhiệt" ở màn kết thúc
+// thay vì chơi lại đúng level cũ.
+function replayGame(nextLevel) {
+  if (nextLevel != null) selectedLevel = nextLevel;
   scriptIndex = 0;
   currentPlayer = 0;
-  extraDeck = [];
   cardHistory = [];
   cardHistoryIdx = -1;
   // Mirror logic cua startGame — recompute totalCards + new script
@@ -805,9 +741,9 @@ function replayGame() {
   currentSession = generateDynamicScript(selectedLevel, totalCards);
   window._activeSession = currentSession;
   showScreen('screen-game');
+  _pickAndPushCard();
   renderTurn();
   showBack();
-  _pickAndPushCard();
 }
 
 function showScreen(id) {
@@ -901,22 +837,6 @@ function playSound(type) {
       osc.connect(gain);
       osc.start();
       osc.stop(ctx.currentTime + 0.12);
-
-    } else if (type === 'keep') {
-      // Keep card: warm double-tone
-      [440, 554].forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0, ctx.currentTime + i * 0.07);
-        g.gain.linearRampToValueAtTime(0.1, ctx.currentTime + i * 0.07 + 0.03);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.07 + 0.2);
-        osc.connect(g);
-        g.connect(ctx.destination);
-        osc.start(ctx.currentTime + i * 0.07);
-        osc.stop(ctx.currentTime + i * 0.07 + 0.2);
-      });
     }
   } catch(e) {}
 }

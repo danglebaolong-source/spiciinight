@@ -1,11 +1,12 @@
 // ─── SPICII NIGHT — SESSION BUILDER ENGINE ─────────────────────────
 // Vanilla browser JS — chạy <script src="engine.js"> sau khi 4 file pool_*.js
-// đã nạp xong. Expose 3 hàm ra window:
+// đã nạp xong. Expose 2 hàm ra window:
 //   - window.generateSession(poolType, currentLevel, playerCount, overrideTotalCards?)
 //   - window.renderCardText(text, currentPlayer, players)
 //   - window.currentSession (gán sau mỗi lần generate, cho script.js đọc)
 //
-// Logic 4 bước + Fallback 3 tầng + Cooldown adjacency + String replacement.
+// Logic: Filter → Tag routing → Nearest-rank heat sampling (mutex-aware)
+// → Cooldown adjacency → String replacement.
 
 (function () {
   'use strict';
@@ -13,7 +14,6 @@
   // ─── CONSTANTS ───────────────────────────────────────────────────
   var HARD_GROUP_TAGS = ['group_only', 'audience', 'chain'];
   var SOLO_TAG = 'intimate_2p';
-  var PHASE_RATIOS = [0.30, 0.40, 0.30];
   var ALL_LABEL = 'cả nhóm';
 
   // ─── UTILITIES ───────────────────────────────────────────────────
@@ -34,12 +34,27 @@
     return false;
   }
 
+  // Dark card thiếu `intensity` (chưa gán tay) → suy ra từ heat đã có sẵn
+  // (heat do content author tự canh chỉnh độ "gắt" của từng lá rồi, dùng
+  // lại luôn thay vì cần chấm điểm nội dung thủ công). Ngưỡng 66/80 chọn
+  // theo phân phối heat thật của 57 lá dark hiện có, chia đều ~1/3 mỗi mức.
+  function inferIntensity(card) {
+    if (card.type !== 'dark' || card.intensity != null) return card.intensity;
+    if (card.heat >= 80) return 3;
+    if (card.heat >= 66) return 2;
+    return 1;
+  }
+
   function getDatabase() {
-    return []
+    var db = []
       .concat(window.POOL_FIRSTDATE || [])
       .concat(window.POOL_COUPLE || [])
       .concat(window.POOL_GROUP || [])
       .concat(window.POOL_WILD || []);
+    for (var i = 0; i < db.length; i++) {
+      if (db[i].type === 'dark' && db[i].intensity == null) db[i].intensity = inferIntensity(db[i]);
+    }
+    return db;
   }
 
   // ─── STEP 1: LEVEL + POOL FILTER ─────────────────────────────────
@@ -72,97 +87,114 @@
     return out;
   }
 
-  // ─── STEP 3: HEAT PHASING (30/40/30 split của sub-pool) ──────────
-  function splitIntoPhases(subPool) {
-    var sorted = subPool.slice().sort(function (a, b) { return a.heat - b.heat; });
+  // ─── STEP 3: NEAREST-RANK HEAT SAMPLING ──────────────────────────
+  // Thay cho cách chia 3 "phase" cứng + quota + fallback mượn phase kề:
+  // sort subPool theo heat, rồi rải `totalCards` điểm chọn ĐỀU trên toàn
+  // bộ dải rank đó (targetRank tuyến tính từ 0 → cuối pool). Mỗi điểm
+  // chọn lá GẦN rank đó nhất còn khả dụng — tự động "mượn" từ rank lân
+  // cận khi rank đích đã hết, không cần bước fallback riêng.
+  //
+  // Vẫn giữ đúng tinh thần "30/40/30" cũ: vì cả pool lẫn quota trước đây
+  // dùng chung tỉ lệ đó, mật độ chọn theo rank vốn đã đều — rải đều tuyến
+  // tính ở đây cho ra đúng kết quả đó, chỉ gọn hơn và không có ranh giới
+  // cứng giữa các phase.
+  function findNearestAvailable(sorted, targetRank, pickedIds, lockedMutex, enforceMutex) {
     var L = sorted.length;
-    var n1 = Math.floor(L * PHASE_RATIOS[0]);
-    var n2 = Math.floor(L * PHASE_RATIOS[1]);
-    return [
-      sorted.slice(0, n1),
-      sorted.slice(n1, n1 + n2),
-      sorted.slice(n1 + n2)
-    ];
-  }
-
-  function computeQuotas(totalCards) {
-    var q1 = Math.round(totalCards * PHASE_RATIOS[0]);
-    var q2 = Math.round(totalCards * PHASE_RATIOS[1]);
-    var q3 = totalCards - q1 - q2;
-    return [q1, q2, q3];
-  }
-
-  // ─── STEP 4: PICK ────────────────────────────────────────────────
-  // Pick `quota` cards từ sourcePool. Bỏ qua card đã pickedIds.
-  // enforceMutex=false → bỏ qua mutexGroup check (Tier 2 fallback).
-  function pickFromPool(sourcePool, quota, pickedIds, lockedMutex, enforceMutex) {
-    var picked = [];
-    if (quota <= 0) return picked;
-    var shuffled = shuffle(sourcePool);
-    for (var i = 0; i < shuffled.length && picked.length < quota; i++) {
-      var c = shuffled[i];
-      if (pickedIds[c.id]) continue;
-      // mutexGroup nhận cả string ("kiss_position") lẫn integer (1, 2…) —
-      // truthy check, JS tự stringify key khi index vào object.
-      // (mutexGroup === 0 hoặc '' = không thuộc nhóm nào, luôn pass)
-      if (enforceMutex && c.mutexGroup && lockedMutex[c.mutexGroup]) continue;
-      picked.push(c);
-      pickedIds[c.id] = true;
-      if (c.mutexGroup) lockedMutex[c.mutexGroup] = true;
-    }
-    return picked;
-  }
-
-  // ─── FALLBACK 3 TIER ─────────────────────────────────────────────
-  function fillShortfall(phasePools, fullSubPool, phaseIdx, needed, pickedIds, lockedMutex) {
-    var extras = [];
-
-    // TIER 1: borrow adjacent phase (giữ mutex + tags)
-    var adjacentOrder;
-    if (phaseIdx === 0)      adjacentOrder = [1];
-    else if (phaseIdx === 2) adjacentOrder = [1];
-    else                     adjacentOrder = [0, 2];
-
-    for (var i = 0; i < adjacentOrder.length && extras.length < needed; i++) {
-      var t1 = pickFromPool(phasePools[adjacentOrder[i]], needed - extras.length,
-                            pickedIds, lockedMutex, true);
-      if (t1.length) {
-        console.warn('[Engine] Tier 1 Fallback: Borrowed ' + t1.length +
-                     ' card(s) from phase ' + (adjacentOrder[i] + 1) +
-                     ' for phase ' + (phaseIdx + 1) + '.');
+    for (var d = 0; d < L; d++) {
+      var lo = targetRank - d;
+      if (lo >= 0 && lo < L) {
+        var c1 = sorted[lo];
+        if (!pickedIds[c1.id] && (!enforceMutex || !c1.mutexGroup || !lockedMutex[c1.mutexGroup])) return c1;
       }
-      extras = extras.concat(t1);
-    }
-
-    // TIER 2: drop mutexGroup (hard routing tags vẫn giữ vì subPool đã filter rồi)
-    if (extras.length < needed) {
-      var t2 = pickFromPool(fullSubPool, needed - extras.length, pickedIds, lockedMutex, false);
-      if (t2.length) {
-        console.warn('[Engine] Tier 2 Fallback: Dropped mutexGroup, picked ' +
-                     t2.length + ' card(s) for phase ' + (phaseIdx + 1) + '.');
+      var hi = targetRank + d;
+      if (d !== 0 && hi >= 0 && hi < L) {
+        var c2 = sorted[hi];
+        if (!pickedIds[c2.id] && (!enforceMutex || !c2.mutexGroup || !lockedMutex[c2.mutexGroup])) return c2;
       }
-      extras = extras.concat(t2);
+    }
+    return null;
+  }
+
+  // Đảm bảo session luôn có ít nhất 1 lá mỗi type trong `requiredTypes`
+  // (vd truth + dare) — thay lá dư thừa nhất (type đang chiếm nhiều slot
+  // nhất) bằng 1 lá đúng type còn thiếu, rồi sort lại heat cho mượt.
+  function ensureTypeCoverage(session, sorted, pickedIds, requiredTypes) {
+    for (var t = 0; t < requiredTypes.length; t++) {
+      var type = requiredTypes[t];
+      var hasType = session.some(function (c) { return c.type === type; });
+      if (hasType) continue;
+
+      var candidate = null;
+      for (var i = 0; i < sorted.length; i++) {
+        if (sorted[i].type === type && !pickedIds[sorted[i].id]) { candidate = sorted[i]; break; }
+      }
+      if (!candidate) continue; // subPool không có type này — bỏ qua, không ép được
+
+      var typeCounts = {};
+      session.forEach(function (c) { typeCounts[c.type] = (typeCounts[c.type] || 0) + 1; });
+      var worstIdx = -1, worstCount = 1;
+      for (var j = 0; j < session.length; j++) {
+        var count = typeCounts[session[j].type];
+        if (count > worstCount) { worstCount = count; worstIdx = j; }
+      }
+      if (worstIdx === -1) continue; // không có lá dư để thay
+
+      pickedIds[session[worstIdx].id] = false;
+      session[worstIdx] = candidate;
+      pickedIds[candidate.id] = true;
+    }
+    session.sort(function (a, b) { return a.heat - b.heat; });
+  }
+
+  function buildSession(subPool, totalCards) {
+    // Shuffle trước khi sort (stable sort) → random hoá thứ tự các lá
+    // cùng mức heat, tránh thiên vị theo thứ tự khai báo trong file pool.
+    var sorted = shuffle(subPool).sort(function (a, b) { return a.heat - b.heat; });
+    var L = sorted.length;
+    var pickedIds = {};
+    var lockedMutex = {};
+    var session = [];
+    var mutexDropped = 0;
+
+    for (var i = 0; i < totalCards; i++) {
+      var targetRank = totalCards <= 1 ? 0 : Math.round((i / (totalCards - 1)) * (L - 1));
+      var card = findNearestAvailable(sorted, targetRank, pickedIds, lockedMutex, true);
+      if (!card) {
+        card = findNearestAvailable(sorted, targetRank, pickedIds, lockedMutex, false);
+        if (card) mutexDropped++;
+      }
+      if (!card) break; // subPool đã cạn hoàn toàn — để injectDuplicates xử lý phần còn thiếu
+      session.push(card);
+      pickedIds[card.id] = true;
+      if (card.mutexGroup) lockedMutex[card.mutexGroup] = true;
     }
 
-    // TIER 3: expand heat bracket — đã bao trùm bởi fullSubPool ở Tier 2.
-    if (extras.length < needed) {
-      console.warn('[Engine] Tier 3: Sub-pool exhausted. Short ' +
-                   (needed - extras.length) + ' card(s) — handing off to duplicate guard.');
+    if (mutexDropped > 0) {
+      console.warn('[Engine] Bỏ enforce mutexGroup cho ' + mutexDropped + ' lá (pool cạn lá cùng mutex-free ở rank đích).');
     }
-
-    return extras;
+    // Đảm bảo tối thiểu 1 truth + 1 dare/session (session cần ≥2 lá mới đủ chỗ)
+    if (session.length >= 2) {
+      ensureTypeCoverage(session, sorted, pickedIds, ['truth', 'dare']);
+    }
+    if (session.length < totalCards) {
+      session = injectDuplicates(session, totalCards - session.length, sorted);
+    }
+    return session;
   }
 
   // ─── ABSOLUTE EXHAUSTION (DUPLICATE INJECTION) ───────────────────
+  // Rải deficit qua nhiều lá khác nhau (round-robin trên bản shuffle) thay
+  // vì random độc lập từng lần — tránh lặp draining vào đúng 1 lá nếu
+  // deficit ≥ 2 trong khi vẫn còn nhiều lá khác để thay phiên.
   function injectDuplicates(session, deficit, sourceCandidates) {
     if (sourceCandidates.length === 0) {
       console.error('[Engine CRITICAL] Zero candidates. Cannot duplicate.');
       return session;
     }
-    console.error('[Engine CRITICAL] Pool fully exhausted. Duplicate cards injected (' +
-                  deficit + ' card(s)) into the session.');
+    console.error('[Engine CRITICAL] Pool cạn — duplicate ' + deficit + ' lá vào session.');
+    var pool = shuffle(sourceCandidates);
     for (var i = 0; i < deficit; i++) {
-      var pick = sourceCandidates[Math.floor(Math.random() * sourceCandidates.length)];
+      var pick = pool[i % pool.length];
       session.push(Object.assign({}, pick, { _duplicate: true }));
     }
     return session;
@@ -198,9 +230,9 @@
     if (overrideTotalCards != null) {
       totalCards = overrideTotalCards;
     } else if (playerCount === 2) {
-      totalCards = 20;
+      totalCards = 7;
     } else {
-      totalCards = Math.min(6 * playerCount, 36);
+      totalCards = 7 + 3 * (playerCount - 2);
     }
 
     // 1) Level + Pool
@@ -217,31 +249,10 @@
       return [];
     }
 
-    // 3) Heat phasing
-    var phasePools = splitIntoPhases(subPool);
-    var quotas = computeQuotas(totalCards);
+    // 3) Nearest-rank heat sampling + mutex + duplicate guard
+    var session = buildSession(subPool, totalCards);
 
-    // 4) Pick per phase with mutex + fallback
-    var pickedIds = {};
-    var lockedMutex = {};
-    var phasePicks = [[], [], []];
-
-    for (var p = 0; p < 3; p++) {
-      var primary = pickFromPool(phasePools[p], quotas[p], pickedIds, lockedMutex, true);
-      phasePicks[p] = primary;
-      if (primary.length < quotas[p]) {
-        var extras = fillShortfall(phasePools, subPool, p, quotas[p] - primary.length,
-                                   pickedIds, lockedMutex);
-        phasePicks[p] = phasePicks[p].concat(extras);
-      }
-    }
-
-    var session = phasePicks[0].concat(phasePicks[1]).concat(phasePicks[2]);
-
-    if (session.length < totalCards) {
-      session = injectDuplicates(session, totalCards - session.length, subPool);
-    }
-
+    // 4) Cooldown adjacency
     session = fixCooldownAdjacency(session);
 
     window.currentSession = session;

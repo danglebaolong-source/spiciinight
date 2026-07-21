@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Spicii Night — Pool Validator</title>
+<style>
+  body { background:#0f0a0a; color:#f5ede8; font-family: 'DM Sans', Consolas, monospace; padding: 24px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; color:#c4a49a; }
+  .ok { color: #4caf7d; }
+  .warn { color: #e09a3a; }
+  .fail { color: #e07070; }
+  pre { white-space: pre-wrap; font-size: 13px; line-height: 1.6; background: #1a1010; padding: 12px; border-radius: 8px; }
+  .section { margin-bottom: 28px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; }
+</style>
+</head>
+<body>
+<h1>🌶 Spicii Night — Pool Validator</h1>
+<p style="color:#8a6a62;font-size:13px;">Chạy sau khi thêm/sửa câu hỏi trong pool_*.js. Mở file này qua dev server (không mở trực tiếp bằng file://).</p>
+<div id="output">Đang kiểm tra...</div>
+
+<!-- Load đúng thứ tự như index.html: pool_*.js → engine.js → validator -->
+<script src="../js/pools/pool_firstdate.js"></script>
+<script src="../js/pools/pool_couple.js"></script>
+<script src="../js/pools/pool_group.js"></script>
+<script src="../js/pools/pool_wild.js"></script>
+<script src="../js/engine.js"></script>
+<script src="validate-pools.js"></script>
+</body>
+</html>

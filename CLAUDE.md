@@ -10,18 +10,27 @@ Chạy trực tiếp trên trình duyệt (mở file hoặc deploy tĩnh).
 ## Cấu trúc file
 
 ```
-index.html          ← Layout + 5 màn hình (screen) + khai báo thứ tự script
-style.css           ← Toàn bộ CSS, CSS variables, dark theme
-engine.js           ← Session builder — IIFE, expose window.generateSession + window.renderCardText
-script.js           ← UI logic, game state, event handlers
-pool_firstdate.js   ← window.POOL_FIRSTDATE  (ID range: 1001-1085, 85 cards)
-pool_couple.js      ← window.POOL_COUPLE
-pool_group.js       ← window.POOL_GROUP
-pool_wild.js        ← window.POOL_WILD
+index.html                    ← Layout + 5 màn hình (screen) + khai báo thứ tự script
+css/
+  style.css                    ← Toàn bộ CSS, CSS variables, dark theme
+js/
+  engine.js                    ← Session builder — IIFE, expose window.generateSession + window.renderCardText
+  script.js                    ← UI logic, game state, event handlers
+  pools/
+    pool_firstdate.js          ← window.POOL_FIRSTDATE  (ID range: 1001-1085, 85 cards)
+    pool_couple.js             ← window.POOL_COUPLE
+    pool_group.js              ← window.POOL_GROUP
+    pool_wild.js               ← window.POOL_WILD
+tools/
+  dev-server.ps1               ← Static file server cho local dev (không có build tool/npm ở máy này)
+.claude/
+  launch.json                  ← Config cho preview_start — trỏ tới tools/dev-server.ps1
 ```
 
+index.html PHẢI nằm ở project root (Vercel static deploy zero-config đọc index.html từ root — không di chuyển file này).
+
 **Thứ tự load script BẮT BUỘC:**
-`pool_*.js` → `engine.js` → `script.js`
+`js/pools/pool_*.js` → `js/engine.js` → `js/script.js`
 (engine.js đọc window.POOL_* được set bởi pool files; script.js gọi window.generateSession từ engine)
 
 ---
@@ -50,15 +59,16 @@ pool_wild.js        ← window.POOL_WILD
 {
   id: 1001,              // unique integer
   pool: 'firstdate',     // 'firstdate' | 'couple' | 'group' | 'wild'
-  type: 'truth',         // 'truth' | 'dare' | 'cooldown' | 'dark' | 'secret'
+  type: 'truth',         // 'truth' | 'dare' | 'cooldown' | 'dark'
   level: 1,              // 1 | 2 | 3
   heat: 25,              // 0–100, điều chỉnh nhiệt độ session
   tags: [],              // mảng string, xem Tag Routing bên dưới
   mutexGroup: 'crazy_love', // string | number | 0 — chỉ pick 1 card trong nhóm
   text: '...',           // nội dung, hỗ trợ tokens {ME} {RANDOM} {ALL}
   note: '...',           // tuỳ chọn, chỉ editorial — engine bỏ qua
-  intensity: 3,          // 1–3, dark card — intensity 3 trigger consent overlay
-  secret: true,          // boolean, secret card
+  intensity: 3,          // 1–3, dark card — intensity 3 trigger consent overlay.
+                         // Nếu không set tay, engine tự suy ra từ heat
+                         // (heat>=80→3, heat>=66→2, còn lại→1).
 }
 ```
 
@@ -66,23 +76,19 @@ pool_wild.js        ← window.POOL_WILD
 
 ## Engine Logic (engine.js)
 
-### 4 bước chính
+### Các bước chính
 1. **Level + Pool filter** — Level 3 → effective pool = `wild` bất kể mode
 2. **Tag routing** — 2 người: loại tag `group_only`, `audience`, `chain` | >2 người: loại tag `intimate_2p`
-3. **Heat phasing 30/40/30** — Sort theo heat, chia 3 phase, pick theo quota
-4. **Pick với Mutex** — Mỗi mutexGroup chỉ xuất hiện 1 lần/session
-
-### Fallback 3 tầng (khi phase không đủ card)
-- Tier 1: Mượn từ phase kề (giữ mutex)
-- Tier 2: Drop mutex, vẫn giữ tag routing
-- Tier 3: Duplicate injection (log CRITICAL)
+3. **Nearest-rank heat sampling** — sort subPool theo heat, rải đều `totalCards` điểm chọn trên toàn dải rank (không chia phase cứng); mỗi điểm chọn lá GẦN rank đích nhất còn khả dụng — tự "mượn" rank lân cận khi rank đích đã hết, không cần bước fallback riêng
+4. **Mutex** — mỗi mutexGroup chỉ xuất hiện 1 lần/session; enforce trước, chỉ bỏ enforce (log warn) khi không còn lá mutex-free nào trong toàn subPool
+5. **Duplicate guard** — subPool cạn hoàn toàn vẫn thiếu → duplicate injection (log CRITICAL), rải qua nhiều lá khác nhau (round-robin) thay vì lặp 1 lá
 
 ### Cooldown adjacency
 Sau khi pick, tự động swap nếu 2 cooldown liền kề nhau.
 
 ### Tổng số thẻ/session
-- 2 người → 20 thẻ
-- >2 người → `min(6 × N, 36)` thẻ
+- 2 người → 7 thẻ
+- >2 người → `7 + 3 × (N - 2)` thẻ (N=3→10, N=4→13, N=5→16, N=6→19, N=8→25)
 
 ### String tokens trong card text
 | Token | Thay bằng |
@@ -105,8 +111,6 @@ players            // [{ name: string, gender: 'nu'|'nam' }]
 scriptIndex        // index thẻ hiện tại trong currentSession
 currentPlayer      // index player hiện tại trong players[]
 flipped            // bool — card đã lật chưa
-currentCardKept    // bool — card hiện tại đã "Giữ" chưa
-extraDeck          // thẻ đã "Giữ", có 30% xác suất xuất hiện lại
 cardHistory        // stack lịch sử thẻ đã hiện
 cardHistoryIdx     // vị trí hiện tại trong history (hỗ trợ Quay lại/Tiếp theo)
 currentSession     // mảng card objects của session hiện tại
@@ -154,7 +158,6 @@ Setup (chọn mode + số người)
 - `dare` → badge hồng
 - `cooldown` → badge amber, nhiệt kế tụt về 25%
 - `dark` → badge đỏ đậm, class `is-dark`; intensity 3+ → hiện consent overlay trước
-- `secret` → render như `truth` (overlay bị disable theo yêu cầu UX mới)
 
 ---
 
@@ -192,7 +195,6 @@ Max width: 480px (mobile-first).
 ```js
 playSound('flip')   // Card flip — soft whoosh (Web Audio API, no external file)
 playSound('swipe')  // Next card — quick tick
-playSound('keep')   // Keep card — warm double tone
 hapticVibrate(intensity)  // Vibration API — intensity 1/2/3
 ```
 
@@ -219,9 +221,8 @@ iOS unlock: `unlockAudio()` phải gọi trong gesture đầu tiên.
 1. **Thứ tự script trong index.html** — đừng đổi, sẽ crash ngay
 2. **engine.js là IIFE** — không expose var ra ngoài, chỉ qua `window.*`
 3. **cardHistory + cardHistoryIdx** phải sync — Quay lại/Tiếp theo phụ thuộc vào đây
-4. **Secret card overlay đã bị disable** — đừng re-enable nếu không có yêu cầu rõ ràng
-5. **Level 3 luôn dùng pool `wild`** — không phụ thuộc mode đang chọn
-6. **`showScreen()` có animation** — không gọi trực tiếp classList nếu cần transition
+4. **Level 3 luôn dùng pool `wild`** — không phụ thuộc mode đang chọn
+5. **`showScreen()` có animation** — không gọi trực tiếp classList nếu cần transition
 
 ---
 

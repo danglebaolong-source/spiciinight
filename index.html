@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="app heat-ice" id="app-root">
@@ -83,22 +83,22 @@
       <div class="level-card l1" onclick="selectLevel(1,this)">
         <span class="level-icon">🌿</span>
         <div>
-          <div class="level-name">Non Spice</div>
-          <div class="level-desc">Nhẹ nhàng, mở lòng, thấu hiểu và gắn kết.</div>
+          <div class="level-name">Nhẹ nhàng và gắn kết</div>
+          <div class="level-desc">Mở lòng, thấu hiểu nhau hơn.</div>
         </div>
       </div>
       <div class="level-card l2" onclick="selectLevel(2,this)">
         <span class="level-icon">🔥</span>
         <div>
-          <div class="level-name">Medium Chili</div>
-          <div class="level-desc">Tăng nhiệt với những chia sẻ riêng tư và tinh tế.</div>
+          <div class="level-name">Riêng tư và tinh tế</div>
+          <div class="level-desc">Tăng nhiệt với những chia sẻ sâu sắc hơn.</div>
         </div>
       </div>
       <div class="level-card l3" id="level-card-3" onclick="selectLevel(3,this)">
         <span class="level-icon">💋</span>
         <div>
-          <div class="level-name">Wild Habanero</div>
-          <div class="level-desc">Trải nghiệm táo bạo và cuồng nhiệt. Không quy tắc, không phán xét.</div>
+          <div class="level-name">Táo bạo và cuồng nhiệt</div>
+          <div class="level-desc">Trải nghiệm không quy tắc, không phán xét.</div>
         </div>
       </div>
     </div>
@@ -144,7 +144,7 @@
       </div>
 
       <div style="display:flex;flex-direction:column;gap:10px;width:100%;">
-        <button id="end-btn-replay" onclick="replayGame()" style="width:100%;padding:16px;background:#c0392b;color:#fff;border:none;border-radius:14px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:500;cursor:pointer;letter-spacing:0.02em;">Chơi lại 🔥</button>
+        <button id="end-btn-replay" style="width:100%;padding:16px;background:#c0392b;color:#fff;border:none;border-radius:14px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:500;cursor:pointer;letter-spacing:0.02em;">Chơi lại 🔥</button>
         <div style="position:relative;display:flex;align-items:center;gap:6px;">
           <a href="https://t.me/+CMevU16YRgxhOTQ9" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:transparent;color:rgba(196,164,154,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:14px;font-family:'DM Sans',sans-serif;font-size:14px;text-decoration:none;cursor:pointer;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -218,26 +218,9 @@
                 <button class="consent-btn" onclick="consentReveal()">Sẵn sàng 🔥</button>
                 <button class="consent-skip" onclick="nextCard()">Bỏ qua thẻ này</button>
               </div>
-              <div class="secret-banner" id="secret-banner">
-                <svg class="secret-svg" width="56" height="56" viewBox="0 0 56 56" fill="none">
-                  <circle cx="28" cy="28" r="26" stroke="rgba(192,132,252,0.25)" stroke-width="0.5"/>
-                  <circle cx="28" cy="28" r="20" stroke="rgba(192,132,252,0.15)" stroke-width="0.5"/>
-                  <rect x="18" y="25" width="20" height="15" rx="3" stroke="rgba(192,132,252,0.7)" stroke-width="1.5" fill="rgba(140,70,255,0.12)"/>
-                  <path d="M21 25V21.5C21 18.5 23 16 28 16C33 16 35 18.5 35 21.5V25" stroke="rgba(192,132,252,0.7)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-                  <circle cx="28" cy="32" r="2.5" fill="rgba(216,180,254,0.75)"/>
-                  <line x1="28" y1="34.5" x2="28" y2="37" stroke="rgba(216,180,254,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                <div class="secret-label">Lá bí mật</div>
-                <div class="secret-hint" id="secret-hint"></div>
-                <div class="secret-tap">Chạm để đọc</div>
-              </div>
               <span class="card-type-badge" id="card-badge-el">Truth</span>
               <div class="card-content" id="card-content"></div>
               <div class="card-footer" id="card-footer-text">Hoàn thành xong nhấn Tiếp theo</div>
-              <div class="secret-actions" id="secret-actions">
-                <button class="btn-reveal" onclick="secretReveal()">Tiết lộ cho đối phương 👁</button>
-                <button class="btn-skip-secret" onclick="secretSkip()">Thực hiện bí mật 🤫</button>
-              </div>
             </div>
           </div>
         </div>
@@ -257,20 +240,18 @@
 
       <div class="action-row hidden" id="action-row" style="display:none">
         <button class="skip-btn" id="skip-btn-el" onclick="goBackCard()">Quay lại</button>
-        <button class="keep-btn" id="keep-btn" onclick="keepCard()" disabled>🔖 Giữ</button>
         <button class="next-btn" onclick="nextCard()">Tiếp theo</button>
       </div>
-      <!-- Secret actions: chỉ hiện sau khi lật secret card -->
     </div>
   </div>
 </div>
 
 <!-- Card pools (window globals): nạp 4 file pool trước engine, engine trước script -->
-<script src="pool_firstdate.js"></script>
-<script src="pool_couple.js"></script>
-<script src="pool_group.js"></script>
-<script src="pool_wild.js"></script>
-<script src="engine.js"></script>
-<script src="script.js"></script>
+<script src="js/pools/pool_firstdate.js"></script>
+<script src="js/pools/pool_couple.js"></script>
+<script src="js/pools/pool_group.js"></script>
+<script src="js/pools/pool_wild.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/script.js"></script>
 </body>
 </html>
