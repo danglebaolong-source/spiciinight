@@ -292,9 +292,11 @@ function updateProgressBar(targetHeat, isCooldown) {
 // ─── RENDER ──────────────────────────────────────────────────────
 function renderTurn() {
   const nameEl = document.getElementById('turn-name');
+  // Restart animation qua requestAnimationFrame thay vì ép forced reflow
+  // (void offsetWidth) — tránh block main thread giữa lúc renderTurn()
+  // đang đổi dồn dập nhiều class/style khác, đỡ giật trên máy yếu.
   nameEl.classList.remove('name-anim');
-  void nameEl.offsetWidth;
-  nameEl.classList.add('name-anim');
+  requestAnimationFrame(() => { nameEl.classList.add('name-anim'); });
   nameEl.textContent = players[currentPlayer].name;
   // Ưu tiên window._currentCard (lá THẬT SỰ đã qua pickCard()); fallback về
   // slot card nếu _pickAndPushCard() chưa chạy (race hiếm).
@@ -579,7 +581,7 @@ function nextCard() {
     showBack();
     scene.classList.add('slide-in');
     setTimeout(() => scene.classList.remove('slide-in'), 350);
-  }, 260);
+  }, 280);
 }
 
 function triggerStageFlash(stageName) {

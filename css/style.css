@@ -339,12 +339,17 @@
     -webkit-transform-style: preserve-3d;
     transform-style: preserve-3d;
     transition: transform 0.55s cubic-bezier(0.45,0,0.55,1);
+    will-change: transform;
   }
   .card-flipper.flipped { -webkit-transform: rotateY(180deg); transform: rotateY(180deg); }
   .card-face-3d {
     position: absolute; inset: 0;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
+    /* Ép mỗi mặt lên layer GPU riêng ngay từ đầu — tránh flash/nhấp nháy
+       khi Safari phải promote/demote compositing layer giữa chừng animation. */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
     border-radius: 20px;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
@@ -369,18 +374,12 @@
   .card-face-front {
     background: var(--bg2);
     border: 1px solid var(--border2);
-    -webkit-transform: rotateY(180deg);
-    transform: rotateY(180deg);
+    -webkit-transform: rotateY(180deg) translateZ(0);
+    transform: rotateY(180deg) translateZ(0);
     transition: border-color 0.8s ease, background 0.8s ease;
   }
   .tap-pulse { animation: tapPulse 2s ease-in-out infinite; }
   @keyframes tapPulse { 0%,100%{opacity:0.4;transform:scale(1);} 50%{opacity:0.7;transform:scale(1.08);} }
-
-  /* ── CARD SLIDE OUT (next) ── */
-  @keyframes slideOut { from{opacity:1;transform:translateX(0) rotate(0deg);} to{opacity:0;transform:translateX(-60px) rotate(-4deg);} }
-  @keyframes slideIn  { from{opacity:0;transform:translateX(40px);} to{opacity:1;transform:translateX(0);} }
-  .card-scene.slide-out { animation: slideOut 0.28s ease forwards; }
-  .card-scene.slide-in  { animation: slideIn  0.32s cubic-bezier(0.22,1,0.36,1) forwards; }
 
   /* ── TURN NAME FADE ── */
   @keyframes nameFade { from{opacity:0;transform:translateY(-6px);} to{opacity:1;transform:translateY(0);} }
