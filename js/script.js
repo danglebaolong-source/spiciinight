@@ -327,10 +327,17 @@ function renderTurn() {
   }
 }
 
+// Timer chờ hết animation lật (0.55s) rồi mới ép ẩn cứng mặt sau —
+// tránh cắt animation giữa chừng, chỉ dọn "bóng ma" sau khi đã lật xong.
+let _backFaceHideTimer = null;
+
 function showBack() {
   flipped = false;
   const flipper = document.getElementById('card-flipper');
   flipper.classList.remove('flipped');
+  if (_backFaceHideTimer) { clearTimeout(_backFaceHideTimer); _backFaceHideTimer = null; }
+  const backFace = document.querySelector('.card-face-back');
+  if (backFace) backFace.classList.remove('force-hidden');
   const front = document.getElementById('card-front');
   front.className = 'card-face-3d card-face-front';
   (function(){const _ar=document.getElementById('action-row');_ar.classList.add('hidden');_ar.style.display='none';})();
@@ -386,6 +393,15 @@ function flipCard() {
 
   document.getElementById('card-flipper').classList.add('flipped');
   playSound('flip');
+
+  // Sau khi animation lật (0.55s) hoàn tất, ép ẩn cứng mặt sau — bảo hiểm
+  // cho trường hợp backface-visibility không được tôn trọng đầy đủ (iOS Safari).
+  if (_backFaceHideTimer) clearTimeout(_backFaceHideTimer);
+  _backFaceHideTimer = setTimeout(() => {
+    const backFace = document.querySelector('.card-face-back');
+    if (backFace) backFace.classList.add('force-hidden');
+    _backFaceHideTimer = null;
+  }, 600);
 }
 
 // ─── CARD PICKING ─────────────────────────────────────────────────
@@ -449,7 +465,10 @@ function renderCardSimple(item) {
 
   // Defensive: mark card front đang hiện (gate flag cho mọi handler khác)
   flipped = true;
+  if (_backFaceHideTimer) { clearTimeout(_backFaceHideTimer); _backFaceHideTimer = null; }
   document.getElementById('card-flipper').classList.add('flipped');
+  const backFaceEl = document.querySelector('.card-face-back');
+  if (backFaceEl) backFaceEl.classList.add('force-hidden');
 
   const typeLabel = { truth:'Truth', dare:'Dare', cooldown:'Cooldown', dark:'Dark' };
   const typeClass = { truth:'badge-truth', dare:'badge-dare', cooldown:'badge-cooldown', dark:'badge-dark' };
