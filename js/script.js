@@ -671,23 +671,31 @@ function showScreen(id) {
     _screenTransitionTimer = null;
   }
 
-  const current = document.querySelector('.screen.active');
-  if (current && current !== next) {
-    current.classList.add('screen-exit');
-    _screenTransitionTimer = setTimeout(() => {
-      // Dọn active cho MỌI màn khác tại thời điểm này (không dựa vào
-      // tham chiếu "current" chốt lúc gọi hàm) — đảm bảo luôn chỉ 1 màn active.
-      document.querySelectorAll('.screen.active').forEach(s => {
-        if (s !== next) s.classList.remove('active', 'screen-exit');
-      });
-      next.classList.add('active', 'screen-enter');
-      setTimeout(() => next.classList.remove('screen-enter'), 420);
-      _screenTransitionTimer = null;
-    }, 230);
-  } else if (!current) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  // Chỉ tìm màn active KHÁC next — nếu next đã là màn active duy nhất
+  // (kể cả đang dở dang screen-exit do bị huỷ transition trước đó), coi
+  // như không có gì phải chuyển, chỉ cần dọn sạch class dở dang.
+  const current = document.querySelector('.screen.active:not(#' + id + ')');
+  if (!current) {
+    document.querySelectorAll('.screen').forEach(s => {
+      if (s !== next) s.classList.remove('active', 'screen-exit');
+    });
+    next.classList.remove('screen-exit');
     next.classList.add('active');
+    return;
   }
+
+  current.classList.add('screen-exit');
+  _screenTransitionTimer = setTimeout(() => {
+    // Dọn active cho MỌI màn khác tại thời điểm này (không dựa vào
+    // tham chiếu "current" chốt lúc gọi hàm) — đảm bảo luôn chỉ 1 màn active.
+    document.querySelectorAll('.screen.active').forEach(s => {
+      if (s !== next) s.classList.remove('active', 'screen-exit');
+    });
+    next.classList.remove('screen-exit');
+    next.classList.add('active', 'screen-enter');
+    setTimeout(() => next.classList.remove('screen-enter'), 420);
+    _screenTransitionTimer = null;
+  }, 230);
 }
 
 // ─── SOUND ENGINE (Web Audio API - no external files) ────────────

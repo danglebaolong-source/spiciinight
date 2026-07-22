@@ -364,6 +364,7 @@
   .card-face-front {
     background: var(--bg2);
     border: 1px solid var(--border2);
+    -webkit-transform: rotateY(180deg);
     transform: rotateY(180deg);
     transition: border-color 0.8s ease, background 0.8s ease;
   }
