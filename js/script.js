@@ -11,14 +11,6 @@ const UI_STRINGS = {
   + '• Bộ bài sẽ chỉ gồm các câu hỏi và yêu cầu trực diện. Bạn có toàn quyền tự thiết kế Dare (hình phạt) riêng sao cho phù hợp với không gian và độ thân mật.',
 };
 
-// Tên hiển thị của mỗi Level — khớp với text trên #screen-level, dùng lại
-// cho nút "Nâng nhiệt" ở màn kết thúc.
-const LEVEL_NAMES = {
-  1: 'Nhẹ nhàng và gắn kết',
-  2: 'Riêng tư và tinh tế',
-  3: 'Táo bạo và cuồng nhiệt',
-};
-
 // ─── RULES MODAL ────────────────────────────────────────────────
 // HTML chỉ giữ placeholder text; nội dung thật được inject từ
 // UI_STRINGS.rulesContent (dùng innerHTML để hỗ trợ <br>).
@@ -342,10 +334,6 @@ function showBack() {
   const front = document.getElementById('card-front');
   front.className = 'card-face-3d card-face-front';
   (function(){const _ar=document.getElementById('action-row');_ar.classList.add('hidden');_ar.style.display='none';})();
-  // Reset consent overlay
-  const consentEl = document.getElementById('consent-overlay');
-  if (consentEl) consentEl.classList.add('hidden');
-  window._pendingCard = null;
   const el2 = document.getElementById('card-badge-el');
   if (el2) el2.style.cssText = '';
   const skipB = document.getElementById('skip-btn-el');
@@ -374,23 +362,6 @@ function flipCard() {
   const footerEl = document.getElementById('card-footer-text');
 
   el.style.cssText = '';
-
-  // Dark card với intensity 3 — consent check trước (giữ nguyên flow này)
-  const consentEl = document.getElementById('consent-overlay');
-  if (card.type === 'dark' && card.intensity >= 3 && consentEl) {
-    consentEl.classList.remove('hidden');
-    contentEl.style.display = 'none';
-    footerEl.style.display = 'none';
-    front.className = 'card-face-3d card-face-front is-dark';
-    el.textContent = 'Dark';
-    el.className = 'card-type-badge badge-dark';
-    window._pendingCard = card;
-    document.getElementById('card-flipper').classList.add('flipped');
-    playSound('flip');
-    hapticVibrate(3);
-    return;
-  }
-  if (consentEl) consentEl.classList.add('hidden');
 
   contentEl.style.display = '';
   footerEl.style.display = '';
@@ -486,10 +457,6 @@ function renderCardSimple(item) {
   const front = document.getElementById('card-front');
   const contentEl = document.getElementById('card-content');
   const footerEl = document.getElementById('card-footer-text');
-  const consentEl = document.getElementById('consent-overlay');
-
-  // LUÔN ẩn consent gate (lá Dangerous đã được consent rồi)
-  if (consentEl) consentEl.classList.add('hidden');
 
   // Reset badge inline style
   el.style.cssText = '';
@@ -610,21 +577,6 @@ function triggerStageFlash(stageName) {
   setTimeout(() => flash.classList.remove('show'), 650);
 }
 
-function consentReveal() {
-  const consentEl = document.getElementById('consent-overlay');
-  if (consentEl) consentEl.classList.add('hidden');
-  const card = window._pendingCard;
-  if (!card) return;
-  const contentEl = document.getElementById('card-content');
-  const footerEl = document.getElementById('card-footer-text');
-  contentEl.style.display = '';
-  contentEl.textContent = renderText(card.text);
-  footerEl.style.display = '';
-  footerEl.textContent = 'Hoàn thành xong nhấn Tiếp theo';
-  (function(){const _ar=document.getElementById('action-row');_ar.classList.remove('hidden');_ar.style.display='flex';})();
-  hapticVibrate(3);
-}
-
 function hapticVibrate(intensity) {
   // Haptic feedback qua Vibration API
   if ('vibrate' in navigator) {
@@ -656,40 +608,15 @@ function showEndScreen() {
   const titleEl   = document.getElementById('end-title');
   const subEl     = document.getElementById('end-sub');
   const replayBtn = document.getElementById('end-btn-replay');
-  const spiceBlock= document.getElementById('spice-rating-block');
-  const labelEl   = document.getElementById('spice-rating-label');
-  const wrapper   = document.getElementById('rating-icons-wrapper');
-  const statusEl  = document.getElementById('spice-status-el');
-
-  // ─── Khởi tạo: reset trạng thái để không bị "dính" giữa các ván ───
-  // Reset text status + clear wrapper rating
-  if (statusEl) statusEl.textContent = '';
-  if (wrapper)  wrapper.innerHTML = '';
-
-  // Helper: inject 5 ô rating với emoji tuỳ chỉnh
-  const injectRatingIcons = (emoji) => {
-    if (!wrapper) return;
-    let html = '';
-    for (let i = 1; i <= 5; i++) {
-      html += `<div class="chili-box" data-value="${i}" onclick="rateSpice(${i})"><span class="chili-emoji">${emoji}</span></div>`;
-    }
-    wrapper.innerHTML = html;
-  };
 
   if (subEl) subEl.textContent = '';
 
   if (selectedLevel === 1) {
-    if (titleEl)   titleEl.innerHTML = 'Tuyệt vời';
-    injectRatingIcons('❤️');
-    if (spiceBlock) spiceBlock.style.display = '';
+    if (titleEl) titleEl.innerHTML = 'Tuyệt vời';
   } else if (selectedLevel === 2) {
-    if (titleEl)   titleEl.innerHTML = 'Quá đã!';
-    injectRatingIcons('🌶');
-    if (spiceBlock) spiceBlock.style.display = '';
+    if (titleEl) titleEl.innerHTML = 'Quá đã!';
   } else {
-    if (titleEl)   titleEl.innerHTML = 'BANGGG! 💥';
-    injectRatingIcons('🌶');
-    if (spiceBlock) spiceBlock.style.display = '';
+    if (titleEl) titleEl.innerHTML = 'BANGGG! 💥';
   }
 
   // ─── CTA: mời nâng level thay vì chỉ chơi lại y hệt ───────────────
@@ -701,7 +628,7 @@ function showEndScreen() {
   const canEscalate = selectedLevel < 3 && !(nextLevel === 3 && isLevel3Hidden());
   if (replayBtn) {
     if (canEscalate) {
-      replayBtn.textContent = 'Nâng nhiệt lên ' + LEVEL_NAMES[nextLevel] + ' →';
+      replayBtn.textContent = 'Nâng nhiệt →';
       replayBtn.onclick = () => replayGame(nextLevel);
     } else {
       replayBtn.textContent = 'Chơi lại';
@@ -709,22 +636,7 @@ function showEndScreen() {
     }
   }
 
-  if (labelEl) labelEl.textContent = 'Để lại cảm nhận để Spicii Night cải tiến tốt hơn nhé';
-
   showScreen('screen-end');
-}
-
-// ─── Spice rating ─────────────────────────────────────────────────
-// Click ô N → toggle active cho 1..N, clear N+1..5.
-// Inject text phản hồi theo level vào #spice-status-el.
-function rateSpice(score) {
-  const wrapper = document.getElementById('rating-icons-wrapper');
-  if (!wrapper) return;
-  wrapper.querySelectorAll('.chili-box').forEach(c => {
-    const v = parseInt(c.dataset.value, 10);
-    c.classList.toggle('active', v <= score);
-  });
-  if ('vibrate' in navigator) navigator.vibrate(15);
 }
 
 // nextLevel (optional) — dùng khi user bấm "Nâng nhiệt" ở màn kết thúc
@@ -745,19 +657,36 @@ function replayGame(nextLevel) {
   showBack();
 }
 
+// Timer dùng chung cho transition đang chờ — cho phép huỷ nếu showScreen()
+// được gọi lại (double-tap, chuyển màn liên tục) trước khi timer cũ chạy
+// xong, tránh 2 màn cùng active một lúc (bug "đè screen lên nhau").
+let _screenTransitionTimer = null;
+
 function showScreen(id) {
+  const next = document.getElementById(id);
+  if (!next) return;
+
+  if (_screenTransitionTimer) {
+    clearTimeout(_screenTransitionTimer);
+    _screenTransitionTimer = null;
+  }
+
   const current = document.querySelector('.screen.active');
-  if (current && current.id !== id) {
+  if (current && current !== next) {
     current.classList.add('screen-exit');
-    setTimeout(() => {
-      current.classList.remove('active','screen-exit');
-      const next = document.getElementById(id);
-      next.classList.add('active','screen-enter');
+    _screenTransitionTimer = setTimeout(() => {
+      // Dọn active cho MỌI màn khác tại thời điểm này (không dựa vào
+      // tham chiếu "current" chốt lúc gọi hàm) — đảm bảo luôn chỉ 1 màn active.
+      document.querySelectorAll('.screen.active').forEach(s => {
+        if (s !== next) s.classList.remove('active', 'screen-exit');
+      });
+      next.classList.add('active', 'screen-enter');
       setTimeout(() => next.classList.remove('screen-enter'), 420);
+      _screenTransitionTimer = null;
     }, 230);
-  } else {
+  } else if (!current) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    next.classList.add('active');
   }
 }
 
