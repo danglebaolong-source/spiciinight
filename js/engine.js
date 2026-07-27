@@ -156,8 +156,17 @@
     var session = [];
     var mutexDropped = 0;
 
+    // Jitter ngẫu nhiên quanh mỗi rank đích — nếu không có bước này, những
+    // rank rơi vào thẻ có heat KHÔNG trùng ai (không có gì để shuffle phá vỡ)
+    // sẽ luôn chọn ra đúng 1 thẻ giống hệt nhau ở mọi session (bug: chơi lại
+    // cùng mode/level ra bài y chang). Biên độ jitter tính theo mật độ trung
+    // bình giữa 2 rank liên tiếp, đủ nhỏ để không phá nhịp heat tăng dần.
+    var jitterRange = Math.max(1, Math.floor(L / (totalCards * 2)));
+
     for (var i = 0; i < totalCards; i++) {
       var targetRank = totalCards <= 1 ? 0 : Math.round((i / (totalCards - 1)) * (L - 1));
+      targetRank += Math.round((Math.random() * 2 - 1) * jitterRange);
+      targetRank = Math.max(0, Math.min(L - 1, targetRank));
       var card = findNearestAvailable(sorted, targetRank, pickedIds, lockedMutex, true);
       if (!card) {
         card = findNearestAvailable(sorted, targetRank, pickedIds, lockedMutex, false);

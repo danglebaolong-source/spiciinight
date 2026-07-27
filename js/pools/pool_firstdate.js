@@ -204,7 +204,7 @@ window.POOL_FIRSTDATE = [
     "heat": 18,
     "tags": [],
     "mutexGroup": "childhood_game",
-    "text": "Trò chơi vận động hoặc môn thể thao tuổi thơ nào từng khiến {ME} bị chấn thương hoặc có kỷ niệm dở khóc dở cười nhất?"
+    "text": "Trò chơi vận động hoặc môn thể thao nào từng khiến {ME} bị chấn thương hoặc có kỷ niệm dở khóc dở cười nhất?"
   },
   {
     "id": 1021,

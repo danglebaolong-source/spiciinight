@@ -386,8 +386,8 @@ window.POOL_GROUP = [
     "heat": 10,
     "tags": [],
     "mutexGroup": 0,
-    "text": "Hãy pha một món đồ uống bất kỳ theo công thức ngẫu hứng và tặng nó cho {RANDOM}.",
-    "note": "Phase 1 hành động nhẹ. Tạo chăm sóc cơ bản vật lý gián tiếp."
+    "text": "Hãy bắt chước giọng nói hoặc điệu bộ của {RANDOM} trong 10 giây, mọi người chấm điểm xem giống bao nhiêu.",
+    "note": "Phase 1 hành động nhẹ. Trò vui bắt chước, không cần đạo cụ, phù hợp mọi số người chơi."
   },
   {
     "id": 3033,

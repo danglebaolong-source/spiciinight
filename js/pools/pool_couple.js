@@ -634,7 +634,7 @@ window.POOL_COUPLE = [
     "heat": 65,
     "tags": [],
     "mutexGroup": "secret_place_touch",
-    "text": "Nơi khoảnh khắc thân mật vượt mức bình thường đầu tiên của hai bạn là ở đâu?"
+    "text": "Nơi đầu tiên mà hai bạn have sex là ở đâu?"
   },
   {
     "id": 2064,
@@ -817,16 +817,6 @@ window.POOL_COUPLE = [
     "text": "Điểm nào trên cơ thể mà {ME} từng tự ti nhưng lại cảm thấy rất an toàn khi được {RANDOM} ôm ấp?"
   },
   {
-    "id": 2082,
-    "pool": "couple",
-    "type": "dare",
-    "level": 2,
-    "heat": 65,
-    "tags": [],
-    "mutexGroup": "face_trace_kiss",
-    "text": "{ME} hãy dùng môi chạm nhẹ và hôn lướt qua hàng lông mày rồi đến bờ mi mắt của {RANDOM}."
-  },
-  {
     "id": 2083,
     "pool": "couple",
     "type": "dark",
@@ -964,7 +954,7 @@ window.POOL_COUPLE = [
     "heat": 55,
     "tags": [],
     "mutexGroup": "blind_face_touch",
-    "text": "{ME} hãy nhắm mắt lại, dùng các ngón tay chậm rãi chạm và cảm nhận từng đường nét trên khuôn mặt {RANDOM}."
+    "text": "{ME} hãy nhắm mắt lại, dùng các ngón tay chậm rãi cảm nhận từng đường nét trên khuôn mặt {RANDOM} và nhận xét về nó."
   },
   {
     "id": 2097,
@@ -1005,5 +995,15 @@ window.POOL_COUPLE = [
     "tags": [],
     "mutexGroup": "visual_trigger_18",
     "text": "{ME} cảm thấy bị thu hút nhiều hơn khi ngắm nhìn {RANDOM} lúc mặc đồ lót quyến rũ hay khi hoàn toàn không mặc gì?"
+  },
+  {
+    "id": 2101,
+    "pool": "couple",
+    "type": "dare",
+    "level": 2,
+    "heat": 65,
+    "tags": [],
+    "mutexGroup": 0,
+    "text": "{ME} hãy massage nhẹ vai và cổ cho {RANDOM} trong 1 phút, vừa làm vừa nói một điều bạn thích ở người ấy."
   }
 ];
