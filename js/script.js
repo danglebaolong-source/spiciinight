@@ -424,35 +424,16 @@ function pickCard() {
 
 // ─── TEXT RENDERING ───────────────────────────────────────────────
 // Delegate {ME}/{RANDOM}/{ALL} sang engine.js (window.renderCardText).
-// Giữ legacy {P1}/{P2}/{anh_chi_P1}/{anh_chi_P2} cho card cũ nếu có.
-// {RANDOM_AC} sau migration đã được replace thành {RANDOM} hết → defensive
-// fallback bằng 'bạn' nếu sót.
 function renderText(tpl) {
   if (!tpl) return '';
   const p1 = players[0] || { name: 'Người 1', gender: 'khac' };
-  const p2 = players[1] || players[0] || { name: 'Người 2', gender: 'khac' };
-  function ac(p) {
-    if (!p) return 'bạn';
-    if (p.gender === 'nam') return 'anh';
-    if (p.gender === 'nu') return 'cô';
-    return 'bạn';
-  }
   const currentName = (players[currentPlayer] && players[currentPlayer].name) || p1.name;
   const playerNames = players.map(p => p.name);
 
-  // Tokens mới ({ME}, {RANDOM}, {ALL}) — qua engine
   let out = tpl;
   if (typeof window.renderCardText === 'function') {
     out = window.renderCardText(out, currentName, playerNames);
   }
-
-  // Legacy tokens cho backward compat
-  out = out
-    .replace(/{P1}/g, p1.name)
-    .replace(/{P2}/g, p2.name)
-    .replace(/{anh_chi_P1}/g, ac(p1))
-    .replace(/{anh_chi_P2}/g, ac(p2))
-    .replace(/{RANDOM_AC}/g, 'bạn');
   return out;
 }
 
